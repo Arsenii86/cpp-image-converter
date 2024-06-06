@@ -44,6 +44,7 @@ static int GetBMPStride(int w) {
 bool SaveBMP(const Path& file, const Image& image){
      try {
         ofstream out(file, ios::binary);
+        out.exceptions(std::ofstream::failbit);
         BitmapFileHeader file_header;
         BitmapInfoHeader info_header;
         const int w = image.GetWidth();
@@ -65,10 +66,8 @@ bool SaveBMP(const Path& file, const Image& image){
         info_header.vert_resol = 11811;
         info_header.using_color_number = 0;
         info_header.meaningful_color_number = 0x1000000;    
-
         out.write(reinterpret_cast<char*>(&file_header),sizeof(file_header));
-        out.write(reinterpret_cast<char*>(&info_header),sizeof(info_header));      
-
+        out.write(reinterpret_cast<char*>(&info_header),sizeof(info_header));
         std::vector<char> buff(stride);
         for (int y = h-1; y >=0 ; --y) {
             const Color* line = image.GetLine(y);
@@ -101,10 +100,26 @@ bool SaveBMP(const Path& file, const Image& image){
 Image LoadBMP(const Path& file){
     try {
         ifstream ifs(file, ios::binary);
+        ifs.exceptions(std::ifstream::failbit);
         BitmapFileHeader file_header;
         BitmapInfoHeader info_header;
         ifs.read(reinterpret_cast<char*>(&file_header),sizeof(file_header));
-        ifs.read(reinterpret_cast<char*>(&info_header),sizeof(info_header));   
+        ifs.read(reinterpret_cast<char*>(&info_header),sizeof(info_header)); 
+        
+        
+        
+        if (info_header.header_size_sec_prt != sizeof(info_header)||
+            info_header.byte_in_data!=GetBMPStride(info_header.width)*info_header.height){
+                cout << "Ошибка считывания данных!" << endl;
+                return   Image{};               
+        }
+        if ( file_header.letter_b != 'B'||
+             file_header.letter_m != 'M'||
+             file_header.offset_from_start != sizeof(file_header) + sizeof(info_header)||
+             file_header.header_data_size != sizeof(file_header) + sizeof(info_header) + GetBMPStride(info_header.width)*info_header.height){
+                cout << "Ошибка считывания данных!"<< endl;
+                return   Image{}; 
+        } 
         const int w = info_header.width;
         const int h = info_header.height;
         int stride = GetBMPStride(w);
